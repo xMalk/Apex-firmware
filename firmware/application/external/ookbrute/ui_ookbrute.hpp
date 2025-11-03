@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2024 HTotoo
+ * copyleft 2024 zxkmm AKA zix aka sommermorgentraum
  *
  * This file is part of PortaPack.
  *
@@ -44,20 +45,33 @@ class OOKBruteView : public View {
     };
 
     TxFrequencyField field_frequency{
-        {0 * 8, 0 * 16},
+        {UI_POS_X(0), UI_POS_Y(0)},
         nav_};
     TransmitterView2 tx_view{
-        {11 * 8, 0 * 16},
+        {11 * 8, UI_POS_Y(0)},
         /*short_ui*/ true};
     app_settings::SettingsManager settings_{
         "tx_ookbrute", app_settings::Mode::TX};
 
+    Labels labels{
+        {{UI_POS_X(0), 2 * 16}, "Start Position:", Theme::getInstance()->fg_light->foreground},
+        {{UI_POS_X(0), 7 * 16}, "Stop Position:", Theme::getInstance()->fg_light->foreground},
+        {{UI_POS_X(0), 13 * 16}, "Encoder Type:", Theme::getInstance()->fg_light->foreground}};
+
     Button button_startstop{
-        {0, 3 * 16, 96, 24},
+        {8, screen_height - 48 - 16, screen_width - 2 * 8, 48},
         LanguageHelper::currentMessages[LANG_START]};
 
+    Button button_input_start_position{
+        {8, 4 * 16, screen_width - 2 * 8, 24},
+        "Input Start Pos"};
+
+    Button button_input_stop_position{
+        {8, 9 * 16, screen_width - 2 * 8, 24},
+        "Input Stop Pos"};
+
     NumberField field_start{
-        {0 * 8, 1 * 16},
+        {UI_POS_X(0), 3 * 16},
         8,
         {0, 2500},
         1,
@@ -65,15 +79,16 @@ class OOKBruteView : public View {
         true};
 
     NumberField field_stop{
-        {11 * 8, 1 * 16},
+        {0, 8 * 16},
         9,
         {0, 2500},
         1,
         ' ',
         true};
 
+    // NB: when add new encoder here you should also change the char count limit for input range buttons by it's digits in DEC
     OptionsField options_atkmode{
-        {0 * 8, 2 * 16},
+        {0, 14 * 16},
         12,
         {{"Came12", 0},
          {"Came24", 1},
@@ -85,6 +100,8 @@ class OOKBruteView : public View {
     bool is_running{false};
 
     uint32_t counter = 0;  // for packet change
+
+    std::string text_input_buffer{};  // this is needed by the text_prompt func
 
     void start();
     void stop();

@@ -191,8 +191,7 @@ set(CPPSRC
 	clock_manager.cpp
 	core_control.cpp
 	database.cpp
-	de_bruijn.cpp
-	rfm69.cpp
+	gradient.cpp
 	event_m0.cpp
 	file_reader.cpp
 	file.cpp
@@ -261,7 +260,6 @@ set(CPPSRC
 	ui/ui_receiver.cpp
 	ui/ui_rssi.cpp
 	ui/ui_freqlist.cpp
-	ui/ui_tv.cpp
 	ui/ui_spectrum.cpp
 	ui/ui_tabview.cpp
 	ui/ui_textentry.cpp
@@ -270,19 +268,15 @@ set(CPPSRC
 	ui/ui_bmpview.cpp
 	apps/ais_app.cpp
 	apps/analog_audio_app.cpp
-	apps/ble_comm_app.cpp
 	apps/ble_rx_app.cpp
 	apps/ble_tx_app.cpp
 	apps/capture_app.cpp
-	apps/ert_app.cpp
 	apps/pocsag_app.cpp
-	apps/soundboard_app.cpp
 	apps/ui_about_simple.cpp
 	apps/ui_adsb_rx.cpp
 	apps/ui_aprs_rx.cpp
 	apps/ui_aprs_tx.cpp
 	apps/ui_battinfo.cpp
-	apps/ui_bht_tx.cpp
 	apps/ui_bmp_file_viewer.cpp
 	apps/ui_btle_rx.cpp
 	apps/ui_debug.cpp
@@ -294,7 +288,6 @@ set(CPPSRC
 	apps/ui_flash_utility.cpp
 	apps/ui_freqman.cpp
 	apps/ui_iq_trim.cpp
-	apps/ui_level.cpp
 	apps/ui_looking_glass_app.cpp
 	apps/ui_mictx.cpp
 	apps/ui_modemsetup.cpp
@@ -303,7 +296,6 @@ set(CPPSRC
 	apps/ui_rds.cpp
 	apps/ui_recon_settings.cpp
 	apps/ui_recon.cpp
-	apps/ui_scanner.cpp
 	apps/ui_sd_over_usb.cpp
 	apps/ui_search.cpp
 	apps/ui_settings.cpp
@@ -319,7 +311,6 @@ set(CPPSRC
 	apps/ui_weatherstation.cpp
 	protocols/aprs.cpp
 	protocols/ax25.cpp
-	protocols/bht.cpp
 	protocols/dcs.cpp
 	protocols/encoders.cpp
 	protocols/modems.cpp

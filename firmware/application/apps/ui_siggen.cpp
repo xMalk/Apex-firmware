@@ -118,7 +118,7 @@ SigGenView::SigGenView(
             symfield_tone.hidden(false);
         }
 
-        if ((v == 0) || (v == 2) || (v == 3)) {  // In Modulation Options CW, QPSK, BPSK we are not using Shapes.
+        if ((v == 0) || (v == 2) || (v == 3) || (v == 7)) {  // In Modulation Options CW, QPSK, BPSK, Pulsed CW we are not using Shapes.
             options_shape.hidden(true);
             text_shape.hidden(true);
         } else {
@@ -152,6 +152,13 @@ SigGenView::SigGenView(
         new_view->on_changed = [this](rf::Frequency f) {
             transmitter_model.set_target_frequency(f);
         };
+    };
+
+    tx_view.on_bandwidth_changed = [this]() {
+        // we don't protect here with auto_update because other field of tx_view obj isn't protected too
+        // to remains the design logic same
+
+        update_config();
     };
 
     tx_view.on_start = [this]() {

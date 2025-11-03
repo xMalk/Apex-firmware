@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2023 Mark Thompson
+ * copyleft 2024 zxkmm AKA zix aka sommermorgentraum
  *
  * This file is part of PortaPack.
  *
@@ -39,10 +40,30 @@ class DebugFontsView : public View {
    public:
     DebugFontsView(NavigationView& nav);
     void paint(Painter& painter) override;
+    void focus() override;
     std::string title() const override { return "Fonts"; };
 
    private:
-    uint16_t display_font(Painter& painter, uint16_t y_offset, const Style* font_style, std::string_view font_name);
+    uint16_t display_font(Painter& painter, uint16_t y_offset, const Style* font_style, std::string_view font_name, bool is_big_font);
+    void update_address_text();
+    void paint_zoomed_text(Painter& painter);
+
+    NumberField field_cursor{
+        {UI_POS_X(0), 0 * 8},
+        4,
+        {0, 1000},
+        1,
+        ' '};
+    NumberField field_zoom_level{
+        {6 * 8, 0 * 8},
+        4,
+        {0, 1000},
+        1,
+        ' '};
+    Text text_address{
+        {screen_width / 2, UI_POS_Y(0), screen_width / 2, 16},
+        "0x20",
+    };
     NavigationView& nav_;
 };
 

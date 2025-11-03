@@ -1,5 +1,5 @@
 /*
- * copyleft 2024 sommermorgentraum
+ * copyleft 2024 zxkmm AKA zix aka sommermorgentraum
  *
  * This file is part of PortaPack.
  *
@@ -26,6 +26,8 @@
 #include "ui_receiver.hpp"
 #include "audio.hpp"
 #include "ch.h"
+
+#include <deque>
 
 namespace ui::external_app::metronome {
 
@@ -58,13 +60,13 @@ class MetronomeView : public View {
     uint32_t current_beat_{0};
 
     Labels labels{
-        {{0 * 8, 1 * 16}, "BPM:", Theme::getInstance()->fg_light->foreground},
-        {{0 * 8, 2 * 16}, "Accent Beep Tune:", Theme::getInstance()->fg_light->foreground},
-        {{0 * 8, 3 * 16}, "Unaccent Beep Tune:", Theme::getInstance()->fg_light->foreground},
-        {{0 * 8, 4 * 16}, "Rhythm:", Theme::getInstance()->fg_light->foreground},
+        {{UI_POS_X(0), 1 * 16}, "BPM:", Theme::getInstance()->fg_light->foreground},
+        {{UI_POS_X(0), 2 * 16}, "Accent Beep Tune:", Theme::getInstance()->fg_light->foreground},
+        {{UI_POS_X(0), 3 * 16}, "Unaccent Beep Tune:", Theme::getInstance()->fg_light->foreground},
+        {{UI_POS_X(0), 4 * 16}, "Rhythm:", Theme::getInstance()->fg_light->foreground},
         {{(sizeof("Rhythm:") + 1) * 8 + 4 * 8, 4 * 16}, "/", Theme::getInstance()->fg_light->foreground},
-        {{0 * 8, 5 * 16}, "Beep Flash Duration:", Theme::getInstance()->fg_light->foreground},
-        {{0 * 8, 6 * 16}, "Volume:", Theme::getInstance()->fg_light->foreground}};
+        {{UI_POS_X(0), 5 * 16}, "Beep Flash Duration:", Theme::getInstance()->fg_light->foreground},
+        {{UI_POS_X(0), 6 * 16}, "Volume:", Theme::getInstance()->fg_light->foreground}};
 
     NumberField field_bpm{
         {(sizeof("BPM:") + 1) * 8, 1 * 16},
@@ -72,6 +74,11 @@ class MetronomeView : public View {
         {1, 1000},
         1,
         ' '};
+
+    Button button_enter_tap_tempo{
+        {(sizeof("BPM:") + 6) * 8, 1 * 16, (sizeof("Tap Tempo") + 3) * 8, 16},
+        "Tap Tempo",
+    };
 
     NumberField field_rythm_unaccent_time{// e.g. 3 in 3/4 beat
                                           {(sizeof("Rhythm:") + 1) * 8, 4 * 16},
@@ -119,6 +126,45 @@ class MetronomeView : public View {
 
     ProgressBar progressbar{
         {0 * 16, 8 * 16, screen_width, screen_height - 14 * 16}};
+};
+
+class MetronomeTapTempoView : public View {
+   public:
+    std::function<void(uint16_t)> on_apply{};
+
+    MetronomeTapTempoView(NavigationView& nav, uint16_t bpm);
+
+    std::string title() const override { return "Tap.T"; };
+    void focus() override;
+    void paint(Painter& painter) override;
+
+   private:
+    void on_tap(Painter& painter);
+
+    NavigationView& nav_;
+
+    uint16_t bpm_{0};
+    uint16_t bpm_when_entered_{0};          // this pass from MetronomeView and need to restore if user cancel
+    std::deque<uint16_t> bpms_deque = {0};  // take average for recent taps to debounce
+    uint32_t last_tap_time{0};
+
+    std::string input_buffer{""};  // needed by text_prompt
+
+    Button button_input{
+        {0, 0, screen_width, 2 * 16},
+        "Input BPM"};
+
+    Button button_tap{
+        {0, 8 * 16, screen_width, 7 * 16},
+        "Tap BPM"};
+
+    Button button_cancel{
+        {1, 17 * 16, screen_width / 2 - 4, 2 * 16},
+        "Cancel"};
+
+    Button button_apply{
+        {1 + screen_width / 2 + 1, 17 * 16, screen_width / 2 - 4, 2 * 16},
+        "Apply"};
 };
 
 }  // namespace ui::external_app::metronome

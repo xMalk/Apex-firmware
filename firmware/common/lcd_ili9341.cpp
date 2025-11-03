@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2014 Jared Boone, ShareBrained Technology, Inc.
  * Copyright (C) 2016 Furrtek
+ * copyleft 2024 zxkmm AKA zix aka sommermorgentraum
  *
  * This file is part of PortaPack.
  *
@@ -31,6 +32,8 @@ using namespace portapack;
 #include "ch.h"
 
 #include "file.hpp"
+
+#include "portapack_persistent_memory.hpp"
 
 #include <complex>
 
@@ -74,13 +77,17 @@ void lcd_display_off() {
     io.lcd_data_write_command_and_data(0x28, {});
 }
 
-void lcd_sleep() {
+void lcd_sleep(bool hw_sleep = true) {
     lcd_display_off();
-    lcd_sleep_in();
+    if (hw_sleep) {
+        lcd_sleep_in();
+    }
 }
 
-void lcd_wake() {
-    lcd_sleep_out();
+void lcd_wake(bool hw_sleep = true) {
+    if (hw_sleep) {
+        lcd_sleep_out();
+    }
     lcd_display_on();
 }
 
@@ -96,6 +103,56 @@ uint32_t lcd_read_display_status() {
 }
 
 void lcd_init() {
+    // LCDs are configured for IM[2:0] = 001
+    // 8080-I system, 16-bit parallel bus
+
+    io.lcd_data_write_command_and_data(0xE0, {0x00, 0x09, 0x0C, 0x03, 0x10, 0x06, 0x34, 0x68,
+                                              0x49, 0x02, 0x0A, 0x07, 0x2C, 0x31, 0x0F});
+
+    io.lcd_data_write_command_and_data(0xE1, {0x00, 0x12, 0x15, 0x02, 0x10, 0x06, 0x35, 0x35,
+                                              0x4A, 0x05, 0x10, 0x0C, 0x2F, 0x33, 0x0F});
+
+    io.lcd_data_write_command_and_data(0xC0, {0x0F, 0x0F});  // Vreg1out=4.5 Vreg2out=-4.5
+
+    io.lcd_data_write_command_and_data(0xC1, {0x44});  // VGH = 5*VCI VGL = -4*VCI
+
+    io.lcd_data_write_command_and_data(0xC5, {0x00, 0x66, 0x80});  // VCOM
+
+    io.lcd_data_write_command_and_data(0x36, {
+                                                 (1 << 7) |  // MY=1
+                                                 (0 << 6) |  // MX=0
+                                                 (0 << 5) |  // MV=0
+                                                 (1 << 4) |  // ML=1: reverse vertical refresh to simplify scrolling logic
+                                                 (1 << 3)    // BGR=1: For Kingtech LCD, BGR filter.
+                                             });
+
+    // io.lcd_data_write_command_and_data(0x36, {0x48});
+    io.lcd_data_write_command_and_data(0x3A, {0x65});  // 0x55 was the original
+    // 这里的刷新率过低？
+    // io.lcd_data_write_command_and_data(0xB1, {0x40, 0x1F});  // fix 60 fps
+    io.lcd_data_write_command_and_data(0xB1, {0xA0, 0x11});  // Frame rate source is 11fps
+
+    io.lcd_data_write_command_and_data(0xB4, {0x02});  // 2 dot inversion
+
+    io.lcd_data_write_command_and_data(0xEE, {0x00, 0x04});
+
+    io.lcd_data_write_command_and_data(0xE9, {0x00});
+
+    io.lcd_data_write_command_and_data(0xF7, {0xA9, 0x51, 0x2C, 0x82});
+
+    io.lcd_data_write_command_and_data(0x21, {});  // Display Inversion On
+
+    io.lcd_data_write_command_and_data(0x11, {});  // Sleep Out
+    chThdSleepMilliseconds(120);                   // Delay 120ms
+
+    io.lcd_data_write_command_and_data(0x29, {});  // Display On
+    chThdSleepMilliseconds(50);                    // Delay 50ms
+
+    // Turn on Tearing Effect Line (TE) output signal.
+    io.lcd_data_write_command_and_data(0x35, {0b00000000});
+}
+
+void lcd_init_pp() {
     // LCDs are configured for IM[2:0] = 001
     // 8080-I system, 16-bit parallel bus
 
@@ -142,7 +199,13 @@ void lcd_init() {
     // REV = 1 (normally white)
     // NL = 0b100111 (default)
     // PCDIV = 0b000000 (default?)
-    io.lcd_data_write_command_and_data(0xB6, {0x0A, 0xA2, 0x27, 0x00});
+
+    /*as per the datasheet chapter 8.3.7, addr B6h,
+    data "REV" bit, liquid crystal type:*/
+    if (portapack::persistent_memory::config_lcd_normally_black())
+        io.lcd_data_write_command_and_data(0xB6, {0x0A, 0x22, 0x27, 0x00});  // IPS : normally black : 0
+    else
+        io.lcd_data_write_command_and_data(0xB6, {0x0A, 0xA2, 0x27, 0x00});  // TFT : normally white : 1
 
     // Power Control 1
     // VRH[5:0]
@@ -272,6 +335,16 @@ void lcd_vertical_scrolling_start_address(
 
 }  // namespace
 
+uint32_t ILI9341::lcd_read_display_id() {
+    io.lcd_data_write_command_and_data(0x04, {});
+    io.lcd_read_data_raw();
+
+    uint32_t value3 = io.lcd_read_data_raw();
+    uint32_t value4 = io.lcd_read_data_raw();
+    uint32_t value5 = io.lcd_read_data_raw();
+    return value5 + (value4 << 8) + (value3 << 16);
+}
+
 bool ILI9341::read_display_status() {
     lcd_reset();
     uint32_t display_status = lcd_read_display_status();
@@ -293,27 +366,44 @@ bool ILI9341::read_display_status() {
 
 void ILI9341::init() {
     lcd_reset();
-    lcd_init();
+    bool hpp = false;
+    // detect method 1
+    uint32_t id = lcd_read_display_id();
+    if (id == 5537894) hpp = true;
+
+    // detect method 2 - not working!
+    if (!hpp) {
+        draw_pixel({318, 478}, ui::Color::red());
+        fill_rectangle_unrolled8({0, 0, 240, 320}, ui::Color::black());
+        std::vector<ui::ColorRGB888> checker(1);
+        read_pixels({318, 478, 1, 1}, checker.data(), 1);
+        if (checker[0].b <= 10 && checker[0].g <= 10 && checker[0].r >= 100)
+            hpp = true;
+    }
+    // init screen
+    if (hpp) {
+        device_type = DEV_PORTARF;
+        lcd_init();
+        screen_width = 320;
+        screen_height = 480;
+    } else {
+        device_type = DEV_PORTAPACK;
+        lcd_init_pp();
+        screen_width = 240;
+        screen_height = 320;
+    }
 }
 
 void ILI9341::shutdown() {
     lcd_reset();
 }
 
-void ILI9341::sleep() {
-    lcd_sleep();
+void ILI9341::sleep(bool hw_sleep) {
+    lcd_sleep(hw_sleep);
 }
 
-void ILI9341::wake() {
-    lcd_wake();
-}
-
-void ILI9341::set_inverted(bool invert) {
-    if (invert) {
-        io.lcd_data_write_command_and_data(0x21, {});
-    } else {
-        io.lcd_data_write_command_and_data(0x20, {});
-    }
+void ILI9341::wake(bool hw_sleep) {
+    lcd_wake(hw_sleep);
 }
 
 void ILI9341::fill_rectangle(ui::Rect r, const ui::Color c) {
@@ -334,7 +424,7 @@ void ILI9341::fill_rectangle_unrolled8(ui::Rect r, const ui::Color c) {
     }
 }
 
-void ILI9341::render_line(const ui::Point p, const uint8_t count, const ui::Color* line_buffer) {
+void ILI9341::render_line(const ui::Point p, const uint16_t count, const ui::Color* line_buffer) {
     lcd_start_ram_write(p, {count, 1});
     io.lcd_write_pixels(line_buffer, count);
 }
@@ -472,8 +562,8 @@ bool ILI9341::draw_bmp_from_sdcard_file(const ui::Point p, const std::filesystem
     bmp_header_t bmp_header;
     uint8_t type = 0;
     char buffer[257];
-    ui::Color line_buffer[240];
-
+    ui::Color line_buffer[320];
+    int16_t start_x = p.x();
     auto result = bmpimage.open(file);
     if (result.is_valid())
         return false;
@@ -507,8 +597,8 @@ bool ILI9341::draw_bmp_from_sdcard_file(const ui::Point p, const std::filesystem
 
     width = bmp_header.width;
     height = bmp_header.height;
-
-    if (width != 240)
+    start_x = (screen_width - start_x - width) / 2 + start_x;  // center horizontally
+    if (width > screen_width || width > 320)
         return false;
 
     file_pos = bmp_header.image_data;
@@ -559,7 +649,7 @@ bool ILI9341::draw_bmp_from_sdcard_file(const ui::Point p, const std::filesystem
             if (read_size.value() != 256)
                 break;
         }
-        render_line({p.x(), p.y() + py}, px, line_buffer);
+        render_line({start_x, p.y() + py}, px, line_buffer);
         px = 0;
         py--;
 
@@ -646,31 +736,58 @@ void ILI9341::draw_bitmap(
     const ui::Size size,
     const uint8_t* const pixels,
     const ui::Color foreground,
-    const ui::Color background) {
-    // Not a transparent background
-    if (ui::Color::magenta().v != background.v) {
-        lcd_start_ram_write(p, size);
+    const ui::Color background,
+    uint8_t zoom_level) {
+    if (zoom_level <= 1) {
+        // Not a transparent background
+        if (ui::Color::magenta().v != background.v) {
+            lcd_start_ram_write(p, size);
 
-        const size_t count = size.width() * size.height();
-        for (size_t i = 0; i < count; i++) {
-            const auto pixel = pixels[i >> 3] & (1U << (i & 0x7));
-            io.lcd_write_pixel(pixel ? foreground : background);
-        }
-    } else {
-        int x = p.x();
-        int y = p.y();
-        int maxX = x + size.width();
-        const size_t count = size.width() * size.height();
-        for (size_t i = 0; i < count; i++) {
-            const auto pixel = pixels[i >> 3] & (1U << (i & 0x7));
-            if (pixel) {
-                draw_pixel(ui::Point(x, y), foreground);
+            const size_t count = size.width() * size.height();
+            for (size_t i = 0; i < count; i++) {
+                const auto pixel = pixels[i >> 3] & (1U << (i & 0x7));
+                io.lcd_write_pixel(pixel ? foreground : background);
             }
-            // Move to the next pixel
-            x++;
-            if (x >= maxX) {
-                x = p.x();
-                y++;
+        } else {
+            // transparent bg
+            int x = p.x();
+            int y = p.y();
+            int maxX = x + size.width();
+            const size_t count = size.width() * size.height();
+            for (size_t i = 0; i < count; i++) {
+                const auto pixel = pixels[i >> 3] & (1U << (i & 0x7));
+                if (pixel) {
+                    if (x <= screen_width && y <= screen_height) draw_pixel(ui::Point(x, y), foreground);
+                }
+                // move to next px
+                x++;
+                if (x >= maxX) {
+                    x = p.x();
+                    y++;
+                }
+            }
+        }
+    } else {  // zoom
+
+        // dot to square
+        for (int y = 0; y < size.height(); y++) {
+            for (int x = 0; x < size.width(); x++) {
+                // pos
+                size_t bit_index = y * size.width() + x;
+                int byte_index = bit_index >> 3;
+                int bit_pos = bit_index & 0x7;
+
+                // val
+                const auto pixel = pixels[byte_index] & (1U << bit_pos);
+                /*                 ^ the byte_index-th bit AKA current bit
+                                                         ^ current px in current byte*/
+
+                if (pixel || background.v != ui::Color::magenta().v) {
+                    fill_rectangle(
+                        {p.x() + x * zoom_level, p.y() + y * zoom_level,
+                         zoom_level, zoom_level},
+                        pixel ? foreground : background);
+                }
             }
         }
     }
@@ -680,8 +797,9 @@ void ILI9341::draw_glyph(
     const ui::Point p,
     const ui::Glyph& glyph,
     const ui::Color foreground,
-    const ui::Color background) {
-    draw_bitmap(p, glyph.size(), glyph.pixels(), foreground, background);
+    const ui::Color background,
+    uint8_t zoom_level) {
+    draw_bitmap(p, glyph.size(), glyph.pixels(), foreground, background, zoom_level);
 }
 
 void ILI9341::scroll_set_area(
@@ -711,8 +829,12 @@ ui::Coord ILI9341::scroll_area_y(const ui::Coord y) const {
 }
 
 void ILI9341::scroll_disable() {
-    lcd_vertical_scrolling_definition(0, height(), 0);
-    lcd_vertical_scrolling_start_address(0);
+    if (device_type == DEV_PORTAPACK) {
+        lcd_vertical_scrolling_definition(0, height(), 0);
+        lcd_vertical_scrolling_start_address(0);
+    } else {
+        io.lcd_data_write_command_and_data(0x13, {});  // normal mode
+    }
 }
 
 } /* namespace lcd */

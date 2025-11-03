@@ -37,7 +37,7 @@ namespace ui {
 
 class AlphanumView : public TextEntryView {
    public:
-    AlphanumView(NavigationView& nav, std::string& str, size_t max_length);
+    AlphanumView(NavigationView& nav, std::string& str, size_t max_length, uint8_t enter_mode);
 
     AlphanumView(const AlphanumView&) = delete;
     AlphanumView(AlphanumView&&) = delete;
@@ -81,7 +81,7 @@ class AlphanumView : public TextEntryView {
     std::array<Button, 29> buttons{};
 
     NewButton button_shift{
-        {192, 214, screen_width / 5, 38},
+        {screen_width - screen_width / 5, 214, screen_width / 5, 38},
         {},
         &bitmap_icon_shift,
         Theme::getInstance()->bg_dark->background,

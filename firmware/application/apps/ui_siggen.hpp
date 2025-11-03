@@ -123,10 +123,11 @@ class SigGenView : public View {
          {"QPSK", 3},
          {"DSB", 4},
          {"AM 100% dep.", 5},
-         {"AM 50% depth", 6}}};
+         {"AM 50% depth", 6},
+         {"Pulse CW 25%", 7}}};
 
     TransmitterView tx_view{
-        16 * 16,
+        (int16_t)UI_POS_Y_BOTTOM(4),
         10000,
         12};
 

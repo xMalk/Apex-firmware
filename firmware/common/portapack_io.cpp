@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2014 Jared Boone, ShareBrained Technology, Inc.
- * Copyleft (ɔ) 2024 zxkmm under GPL license
+ * copyleft 2024 zxkmm AKA zix aka sommermorgentraum
  *
  * This file is part of PortaPack.
  *
@@ -33,6 +33,42 @@ using namespace lpc43xx;
 #include <cstdint>
 
 namespace portapack {
+
+DeviceType device_type = DEV_PORTAPACK;
+
+void IO::lcd_read_bytes(uint8_t* byte, size_t byte_count) {
+    if (portapack::device_type == portapack::DeviceType::DEV_PORTAPACK) {
+        size_t word_count = byte_count / 2;
+        while (word_count) {
+            const auto word = lcd_read_data();
+            *(byte++) = word >> 8;
+            *(byte++) = word >> 0;
+            word_count--;
+        }
+        if (byte_count & 1) {
+            const auto word = lcd_read_data();
+            *(byte++) = word >> 8;
+        }
+        return;
+    }
+    // prf
+    //--dummy read:
+    dir_read();
+    lcd_rd_assert();
+    halPolledDelay(71);
+    data_read();
+    lcd_rd_deassert();
+    size_t word_count = byte_count / 3;
+    for (size_t i = 0; i < word_count; i++) {
+        uint32_t word = lcd_read_data();  // reads 3 byte of data
+        uint8_t r = ((word >> 16) & 0xff);
+        uint8_t g = ((word >> 8) & 0xff);
+        uint8_t b = ((word >> 0) & 0xff);
+        *(byte++) = r;
+        *(byte++) = g << 2;
+        *(byte++) = b;
+    }
+}
 
 void IO::init() {
     data_mask_set();
@@ -78,11 +114,11 @@ void IO::reference_oscillator(const bool enable) {
 }
 
 bool IO::get_dark_cover() {
-    return portapack::persistent_memory::apply_fake_brightness() & (!portapack::persistent_memory::config_lcd_inverted_mode());
+    return portapack::persistent_memory::apply_fake_brightness();
 }
 
-bool IO::get_is_inverted() {
-    return portapack::persistent_memory::config_lcd_inverted_mode();
+bool IO::get_is_normally_black() {
+    return portapack::persistent_memory::config_lcd_normally_black();
 }
 
 uint8_t IO::get_brightness() {
@@ -90,7 +126,7 @@ uint8_t IO::get_brightness() {
 }
 
 void IO::update_cached_values() {
-    inverted_enabled = get_is_inverted();
+    lcd_normally_black = get_is_normally_black();
     dark_cover_enabled = get_dark_cover();
     brightness = get_brightness();
 }

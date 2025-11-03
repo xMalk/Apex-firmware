@@ -1,6 +1,8 @@
+// CVS Spam app by RocketGod (@rocketgod-git) https://betaskynet.com
+// Original .cu8 files by @jimilinuxguy https://github.com/jimilinuxguy/customer-assistance-buttons-sdr
+// If you can read this, you're a nerd. :P
+// Come join us at https://discord.gg/thepiratesreborn
 
-// RocketGod's Shopping Cart Lock app
-// https://betaskynet.com
 #include "ui.hpp"
 #include "shoppingcart_lock.hpp"
 #include "ui_navigation.hpp"
@@ -8,7 +10,7 @@
 
 namespace ui::external_app::shoppingcart_lock {
 void initialize_app(NavigationView& nav) {
-    baseband::run_image(portapack::spi_flash::image_tag_audio_tx);
+    baseband::run_prepared_image(portapack::memory::map::m4_code.base());
     nav.push<ShoppingCartLock>();
 }
 }  // namespace ui::external_app::shoppingcart_lock
@@ -60,7 +62,7 @@ __attribute__((section(".external_app.app_shoppingcart_lock.application_informat
     /*.menu_location = */ app_location_t::UTILITIES,
     /*.desired_menu_position = */ -1,
 
-    /*.m4_app_tag = portapack::spi_flash::image_tag_afsk_rx */ {'P', 'A', 'T', 'X'},
-    /*.m4_app_offset = */ 0x00000000,  // will be filled at compile time
+    /*.m4_app_tag = portapack::spi_flash::image_tag_audio_tx */ {'P', 'A', 'T', 'X'},
+    /*.m4_app_offset = */ 0x00000000,
 };
 }

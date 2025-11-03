@@ -1,5 +1,8 @@
-// RocketGod's Shopping Cart Lock app
-// https://betaskynet.com
+// CVS Spam app by RocketGod (@rocketgod-git) https://betaskynet.com
+// Original .cu8 files by @jimilinuxguy https://github.com/jimilinuxguy/customer-assistance-buttons-sdr
+// If you can read this, you're a nerd. :P
+// Come join us at https://discord.gg/thepiratesreborn
+
 #pragma once
 
 #include "ui_widget.hpp"
@@ -27,8 +30,8 @@ class ShoppingCartLock : public View {
     void focus() override;
 
    private:
-    static constexpr size_t BUFFER_SIZE = 8192;
-    static constexpr size_t NUM_BUFFERS = 8;
+    static constexpr size_t BUFFER_SIZE = 512;
+    static constexpr size_t NUM_BUFFERS = 2;
     const std::string shoppingcart_lock_file{"shopping_cart_lock.wav"};
     const std::string shoppingcart_unlock_file{"shopping_cart_unlock.wav"};
 
@@ -55,23 +58,23 @@ class ShoppingCartLock : public View {
     void restart_playback();
 
     MenuView menu_view{
-        {0, 0, 240, 150},
+        {0, 0, screen_width, 150},
         true};
 
     Text text_empty{
-        {40, 70, 160, 16},
+        {UI_POS_X_CENTER(20), 70, 160, 16},
         "RocketGod was here"};
 
     Button button_lock{
-        {40, 165, 160, 35},
+        {UI_POS_X_CENTER(20), 165, 160, 35},
         LanguageHelper::currentMessages[LANG_LOCK]};
 
     Button button_unlock{
-        {40, 205, 160, 35},
+        {UI_POS_X_CENTER(20), 205, 160, 35},
         LanguageHelper::currentMessages[LANG_UNLOCK]};
 
     Button button_stop{
-        {40, 245, 160, 35},
+        {UI_POS_X_CENTER(20), 245, 160, 35},
         LanguageHelper::currentMessages[LANG_STOP]};
 
     MessageHandlerRegistration message_handler_fifo_signal{

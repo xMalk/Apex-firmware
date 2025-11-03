@@ -35,7 +35,7 @@
 #include "ui_receiver.hpp"
 #include "string_format.hpp"
 #include "analog_audio_app.hpp"
-#include "spectrum_color_lut.hpp"
+#include "gradient.hpp"
 
 namespace ui {
 
@@ -51,9 +51,6 @@ namespace ui {
 #define LOOKING_GLASS_SINGLEPASS 2
 // one spectrum line number of bins
 #define SPEC_NB_BINS 256
-// screen dimensions
-#define SCREEN_W 240
-#define SCREEN_H 320
 
 class GlassView : public View {
    public:
@@ -74,6 +71,7 @@ class GlassView : public View {
 
    private:
     NavigationView& nav_;
+    Gradient gradient{};
     RxRadioState radio_state_{ReceiverModel::Mode::SpectrumAnalysis};
     // Settings
     rf::Frequency f_min = 260 * MHZ_DIV;  // Default to 315/433 remote range.
@@ -154,8 +152,8 @@ class GlassView : public View {
     uint8_t min_color_power{0};  // Filter cutoff level.
     uint32_t pixel_index{0};
 
-    std::array<Color, SCREEN_W> spectrum_row{};
-    std::array<uint8_t, SCREEN_W> spectrum_data{};
+    std::vector<Color> spectrum_row{};
+    std::vector<uint8_t> spectrum_data{};
     ChannelSpectrumFIFO* fifo{};
 
     int32_t steps = 1;
@@ -167,12 +165,12 @@ class GlassView : public View {
     rf::Frequency max_freq_hold = 0;
     rf::Frequency last_max_freq = 0;
     int16_t max_freq_power = -1000;
-    uint8_t bin_length = SCREEN_W;
+    uint8_t bin_length = screen_width;
     uint8_t offset = 0;
     uint8_t ignore_dc = 0;
 
     Labels labels{
-        {{0, 0 * 16}, "MIN:     MAX:     LNA   VGA  ", Theme::getInstance()->fg_light->foreground},
+        {{0, UI_POS_Y(0)}, "MIN:     MAX:     LNA   VGA  ", Theme::getInstance()->fg_light->foreground},
         {{0, 1 * 16}, "RANGE:       FILTER:     AMP:", Theme::getInstance()->fg_light->foreground},
         {{0, 2 * 16}, "P:", Theme::getInstance()->fg_light->foreground},
         {{0, 3 * 16}, "MARKER:          MHz RXIQCAL", Theme::getInstance()->fg_light->foreground},
@@ -180,24 +178,24 @@ class GlassView : public View {
         {{0, 4 * 16}, "RES:     VOL:", Theme::getInstance()->fg_light->foreground}};
 
     NumberField field_frequency_min{
-        {4 * 8, 0 * 16},
+        {4 * 8, UI_POS_Y(0)},
         4,
         {0, 7199},
         1,  // number of steps by encoder delta
         ' '};
 
     NumberField field_frequency_max{
-        {13 * 8, 0 * 16},
+        {13 * 8, UI_POS_Y(0)},
         4,
         {1, 7200},
         1,  // number of steps by encoder delta
         ' '};
 
     LNAGainField field_lna{
-        {21 * 8, 0 * 16}};
+        {21 * 8, UI_POS_Y(0)}};
 
     VGAGainField field_vga{
-        {27 * 8, 0 * 16}};
+        {27 * 8, UI_POS_Y(0)}};
 
     TextField field_range{
         {6 * 8, 1 * 16, 6 * 8, 16},
@@ -221,7 +219,7 @@ class GlassView : public View {
         {}};
 
     ButtonWithEncoder button_beep_squelch{
-        {240 - 8 * 8, 2 * 16 + 4, 8 * 8, 1 * 8},
+        {screen_width - 8 * 8, 2 * 16 + 4, 8 * 8, 1 * 8},
         ""};
 
     TextField field_marker{
@@ -292,15 +290,15 @@ class GlassView : public View {
         }};
 
     Button button_jump{
-        {SCREEN_W - 4 * 8, 5 * 16, 4 * 8, 16},
+        {screen_width - 4 * 8, 5 * 16, 4 * 8, 16},
         "JMP"};
 
     Button button_rst{
-        {SCREEN_W - 9 * 8, 5 * 16, 4 * 8, 16},
+        {screen_width - 9 * 8, 5 * 16, 4 * 8, 16},
         "RST"};
 
     Text freq_stats{
-        {0 * 8, 5 * 16, SCREEN_W - 10 * 8, 8},
+        {UI_POS_X(0), 5 * 16, screen_width - 10 * 8, 8},
         ""};
 
     MessageHandlerRegistration message_handler_spectrum_config{

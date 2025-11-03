@@ -127,6 +127,15 @@ class Message {
         FreqChangeCommand = 70,
         I2CDevListChanged = 71,
         LightData = 72,
+        WeFaxRxConfigure = 73,
+        WeFaxRxStatusData = 74,
+        WeFaxRxImageData = 75,
+        WFMAMConfigure = 76,
+        NoaaAptRxConfigure = 77,
+        NoaaAptRxStatusData = 78,
+        NoaaAptRxImageData = 79,
+        FSKPacket = 80,
+        EPIRBPacket = 81,
         MAX
     };
 
@@ -331,6 +340,17 @@ class AISPacketMessage : public Message {
     baseband::Packet packet;
 };
 
+class EPIRBPacketMessage : public Message {
+   public:
+    constexpr EPIRBPacketMessage(
+        const baseband::Packet& packet)
+        : Message{ID::EPIRBPacket},
+          packet{packet} {
+    }
+
+    baseband::Packet packet;
+};
+
 class TPMSPacketMessage : public Message {
    public:
     constexpr TPMSPacketMessage(
@@ -445,6 +465,17 @@ struct BlePacketData {
     uint8_t dataLen;
 };
 
+struct FskPacketData {
+    int8_t real;
+    int8_t imag;
+    int max_dB;
+    uint8_t data[512];
+    uint16_t dataLen;
+    uint64_t syncWord;
+    float power;
+    float frequency_offset_hz;
+};
+
 class BLEPacketMessage : public Message {
    public:
     constexpr BLEPacketMessage(
@@ -454,6 +485,17 @@ class BLEPacketMessage : public Message {
     }
 
     BlePacketData* packet{nullptr};
+};
+
+class FSKRxPacketMessage : public Message {
+   public:
+    constexpr FSKRxPacketMessage(
+        FskPacketData* packet)
+        : Message{ID::FSKPacket},
+          packet{packet} {
+    }
+
+    FskPacketData* packet{nullptr};
 };
 
 class CodedSquelchMessage : public Message {
@@ -580,11 +622,42 @@ class WFMConfigureMessage : public Message {
     const iir_biquad_config_t audio_deemph_config;
 };
 
+class WFMAMConfigureMessage : public Message {
+   public:
+    constexpr WFMAMConfigureMessage(
+        const fir_taps_real<24> decim_0_filter,
+        const fir_taps_real<32> decim_1_filter,
+        const fir_taps_real<64> audio_filter,
+        const size_t deviation,
+        const iir_biquad_config_t audio_hpf_config,
+        const iir_biquad_config_t audio_deemph_config)
+        : Message{ID::WFMAMConfigure},
+          decim_0_filter(decim_0_filter),
+          decim_1_filter(decim_1_filter),
+          audio_filter(audio_filter),
+          deviation{deviation},
+          audio_hpf_config(audio_hpf_config),
+          audio_deemph_config(audio_deemph_config) {
+    }
+
+    const fir_taps_real<24> decim_0_filter;
+    const fir_taps_real<32> decim_1_filter;
+    const fir_taps_real<64> audio_filter;
+    const size_t deviation;
+    const iir_biquad_config_t audio_hpf_config;
+    const iir_biquad_config_t audio_deemph_config;
+};
+
 class AMConfigureMessage : public Message {
    public:
     enum class Modulation : int32_t {
         DSB = 0,
         SSB = 1,
+        SSB_FM = 2,  // Added new for RX Wefax mode,  to demodulate APT signal ,FM modulated inside audio subcarrier tones, and then up broadcasted in SSB USB .
+    };
+    enum class Zoom_waterfall : size_t {
+        ZOOM_x_1 = 1,
+        ZOOM_x_2 = 2,
     };
 
     constexpr AMConfigureMessage(
@@ -593,14 +666,17 @@ class AMConfigureMessage : public Message {
         const fir_taps_real<32> decim_2_filter,
         const fir_taps_complex<64> channel_filter,
         const Modulation modulation,
-        const iir_biquad_config_t audio_hpf_config)
+        const iir_biquad_config_t audio_hpf_lpf_config,
+        const size_t channel_spectrum_decimation_factor)
+
         : Message{ID::AMConfigure},
           decim_0_filter(decim_0_filter),
           decim_1_filter(decim_1_filter),
           decim_2_filter(decim_2_filter),
           channel_filter(channel_filter),
           modulation{modulation},
-          audio_hpf_config(audio_hpf_config) {
+          audio_hpf_lpf_config(audio_hpf_lpf_config),
+          channel_spectrum_decimation_factor(channel_spectrum_decimation_factor) {
     }
 
     const fir_taps_real<24> decim_0_filter;
@@ -608,7 +684,8 @@ class AMConfigureMessage : public Message {
     const fir_taps_real<32> decim_2_filter;
     const fir_taps_complex<64> channel_filter;
     const Modulation modulation;
-    const iir_biquad_config_t audio_hpf_config;
+    const iir_biquad_config_t audio_hpf_lpf_config;
+    const size_t channel_spectrum_decimation_factor;
 };
 
 // TODO: Put this somewhere else, or at least the implementation part.
@@ -1085,24 +1162,27 @@ class FSKConfigureMessage : public Message {
 class FSKRxConfigureMessage : public Message {
    public:
     constexpr FSKRxConfigureMessage(
-        const fir_taps_real<24> decim_0_filter,
-        const fir_taps_real<32> decim_1_filter,
-        const fir_taps_real<32> channel_filter,
-        const size_t channel_decimation,
-        const size_t deviation)
+        const uint8_t samplesPerSymbol,
+        const uint32_t syncWord,
+        const uint8_t syncWordLength,
+        const uint32_t preamble,
+        const uint8_t preambleLength,
+        const uint16_t numDataBytes)
         : Message{ID::FSKRxConfigure},
-          decim_0_filter(decim_0_filter),
-          decim_1_filter(decim_1_filter),
-          channel_filter(channel_filter),
-          channel_decimation{channel_decimation},
-          deviation{deviation} {
+          samplesPerSymbol(samplesPerSymbol),
+          syncWord(syncWord),
+          syncWordLength(syncWordLength),
+          preamble(preamble),
+          preambleLength(preambleLength),
+          numDataBytes(numDataBytes) {
     }
 
-    const fir_taps_real<24> decim_0_filter;
-    const fir_taps_real<32> decim_1_filter;
-    const fir_taps_real<32> channel_filter;
-    const size_t channel_decimation;
-    const size_t deviation;
+    const uint8_t samplesPerSymbol;
+    const uint32_t syncWord;
+    const uint8_t syncWordLength;
+    const uint32_t preamble;
+    const uint8_t preambleLength;
+    const uint16_t numDataBytes;
 };
 
 class POCSAGConfigureMessage : public Message {
@@ -1435,6 +1515,57 @@ class I2CDevListChangedMessage : public Message {
    public:
     constexpr I2CDevListChangedMessage()
         : Message{ID::I2CDevListChanged} {}
+};
+
+class WeFaxRxConfigureMessage : public Message {
+   public:
+    constexpr WeFaxRxConfigureMessage(uint8_t lpm, uint8_t ioc)
+        : Message{ID::WeFaxRxConfigure},
+          lpm{lpm},
+          ioc{ioc} {
+    }
+    uint8_t lpm = 120;
+    uint8_t ioc = 0;
+};
+
+class WeFaxRxStatusDataMessage : public Message {
+   public:
+    constexpr WeFaxRxStatusDataMessage(uint8_t state)
+        : Message{ID::WeFaxRxStatusData},
+          state{state} {
+    }
+    uint8_t state = 0;
+};
+
+class WeFaxRxImageDataMessage : public Message {
+   public:
+    constexpr WeFaxRxImageDataMessage()
+        : Message{ID::WeFaxRxImageData} {}
+    uint8_t image[400]{0};
+    uint32_t cnt = 0;
+};
+
+class NoaaAptRxConfigureMessage : public Message {
+   public:
+    constexpr NoaaAptRxConfigureMessage()
+        : Message{ID::NoaaAptRxConfigure} {}
+};
+
+class NoaaAptRxStatusDataMessage : public Message {
+   public:
+    constexpr NoaaAptRxStatusDataMessage(uint8_t state)
+        : Message{ID::NoaaAptRxStatusData},
+          state{state} {
+    }
+    uint8_t state = 0;
+};
+
+class NoaaAptRxImageDataMessage : public Message {
+   public:
+    constexpr NoaaAptRxImageDataMessage()
+        : Message{ID::NoaaAptRxImageData} {}
+    uint8_t image[400]{0};
+    uint32_t cnt = 0;
 };
 
 #endif /*__MESSAGE_H__*/

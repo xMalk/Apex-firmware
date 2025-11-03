@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 Jared Boone, ShareBrained Technology, Inc.
+ * copyleft 2025 zxkmm AKA zix aka sommermorgentraum
  *
  * This file is part of PortaPack.
  *
@@ -20,8 +21,6 @@
  */
 
 #include "ui_spectrum.hpp"
-
-#include "spectrum_color_lut.hpp"
 
 #include "portapack.hpp"
 using namespace portapack;
@@ -62,7 +61,7 @@ void AudioSpectrumView::paint(Painter& painter) {
 
     // Cursor
     const Rect r_cursor{
-        field_frequency.value() / (48000 / 240), r.bottom() - 32 - cursor_band_height,
+        field_frequency.value() / (48000 / screen_width), r.bottom() - 32 - cursor_band_height,
         1, cursor_band_height};
     painter.fill_rectangle(
         r_cursor,
@@ -102,6 +101,15 @@ void FrequencyScale::set_channel_filter(
     }
 }
 
+void FrequencyScale::set_cursor_position(const int32_t position) {
+    cursor_position = position;
+
+    cursor_position = std::min<int32_t>(cursor_position, screen_width / 2 - 1);
+    cursor_position = std::max<int32_t>(cursor_position, -1 * screen_width / 2);
+
+    set_dirty();
+}
+
 void FrequencyScale::paint(Painter& painter) {
     const auto r = screen_rect();
 
@@ -115,14 +123,12 @@ void FrequencyScale::paint(Painter& painter) {
     draw_filter_ranges(painter, r);
     draw_frequency_ticks(painter, r);
 
-    if (_blink) {
-        const Rect r_cursor{
-            118 + cursor_position, r.bottom() - filter_band_height,
-            5, filter_band_height};
-        painter.fill_rectangle(
-            r_cursor,
-            Color::red());
-    }
+    const Rect r_cursor{
+        (screen_width / 2 - 2) + cursor_position, r.bottom() - filter_band_height,
+        5, filter_band_height};
+    painter.fill_rectangle(
+        r_cursor,
+        Color::red());
 }
 
 void FrequencyScale::clear() {
@@ -206,24 +212,18 @@ void FrequencyScale::draw_filter_ranges(Painter& painter, const Rect r) {
 }
 
 void FrequencyScale::on_focus() {
-    _blink = true;
-    on_tick_second();
-    signal_token_tick_second = rtc_time::signal_tick_second += [this]() {
-        this->on_tick_second();
-    };
+    set_dirty();
 }
 
 void FrequencyScale::on_blur() {
-    rtc_time::signal_tick_second -= signal_token_tick_second;
-    _blink = false;
     set_dirty();
 }
 
 bool FrequencyScale::on_encoder(const EncoderEvent delta) {
     cursor_position += delta;
 
-    cursor_position = std::min<int32_t>(cursor_position, 119);
-    cursor_position = std::max<int32_t>(cursor_position, -120);
+    cursor_position = std::min<int32_t>(cursor_position, screen_width / 2 - 1);
+    cursor_position = std::max<int32_t>(cursor_position, -1 * screen_width / 2);
 
     set_dirty();
 
@@ -233,8 +233,9 @@ bool FrequencyScale::on_encoder(const EncoderEvent delta) {
 bool FrequencyScale::on_key(const KeyEvent key) {
     if (key == KeyEvent::Select) {
         if (on_select) {
-            on_select((cursor_position * spectrum_sampling_rate) / 240);
+            on_select((cursor_position * spectrum_sampling_rate) / screen_width);
             cursor_position = 0;
+            set_dirty();
             return true;
         }
     }
@@ -242,9 +243,13 @@ bool FrequencyScale::on_key(const KeyEvent key) {
     return false;
 }
 
-void FrequencyScale::on_tick_second() {
-    set_dirty();
-    _blink = !_blink;
+bool FrequencyScale::on_touch(const TouchEvent touch) {
+    if (touch.type == TouchEvent::Type::Start) {
+        if (on_select) {
+            on_select((touch.point.x() * spectrum_sampling_rate) / screen_width);
+        }
+    }
+    return true;
 }
 
 /* WaterfallWidget *********************************************************/
@@ -256,6 +261,8 @@ void WaterfallWidget::on_show() {
 
     const auto screen_r = screen_rect();
     display.scroll_set_area(screen_r.top(), screen_r.bottom());
+
+    clear();
 }
 
 void WaterfallWidget::on_hide() {
@@ -263,28 +270,35 @@ void WaterfallWidget::on_hide() {
      * position?
      */
     display.scroll_disable();
+    clear();
 }
 
 void WaterfallWidget::on_channel_spectrum(
     const ChannelSpectrum& spectrum) {
     /* TODO: static_assert that message.spectrum.db.size() >= pixel_row.size() */
-
-    std::array<Color, 240> pixel_row;
-    for (size_t i = 0; i < 120; i++) {
-        const auto pixel_color = spectrum_rgb3_lut[spectrum.db[256 - 120 + i]];
+    std::vector<Color> pixel_row(screen_width);
+    for (size_t i = 0; i < screen_width / 2; i++) {
+        const auto pixel_color = gradient.lut[spectrum.db[256 - screen_width / 2 + i]];
         pixel_row[i] = pixel_color;
     }
 
-    for (size_t i = 120; i < 240; i++) {
-        const auto pixel_color = spectrum_rgb3_lut[spectrum.db[i - 120]];
+    for (size_t i = screen_width / 2; i < screen_width; i++) {
+        const auto pixel_color = gradient.lut[spectrum.db[i - screen_width / 2]];
         pixel_row[i] = pixel_color;
     }
-
     const auto draw_y = display.scroll(1);
-
     display.draw_pixels(
-        {{0, draw_y}, {pixel_row.size(), 1}},
+        {{0, draw_y}, {(int)pixel_row.size(), 1}},
         pixel_row);
+}
+
+bool WaterfallWidget::on_touch(const TouchEvent event) {
+    if (event.type == TouchEvent::Type::Start) {
+        if (on_touch_select) {
+            on_touch_select(event.point.x(), event.point.y());
+        }
+    }
+    return true;
 }
 
 void WaterfallWidget::clear() {
@@ -305,6 +319,22 @@ WaterfallView::WaterfallView(const bool cursor) {
     frequency_scale.on_select = [this](int32_t offset) {
         if (on_select) on_select(offset);
     };
+
+    waterfall_widget.on_touch_select = [this](int32_t x, int32_t y) {
+        if (y > screen_height - screen_height * 0.1) return;  // prevent ghost touch
+
+        frequency_scale.focus();  // focus on frequency scale to show cursor
+
+        if (sampling_rate) {
+            // screen x to frequency scale x, NB we need two widgets align
+            int32_t cursor_position = x - (screen_width / 2);
+            frequency_scale.set_cursor_position(cursor_position);
+        }
+    };
+
+    if (!waterfall_widget.gradient.load_file(default_gradient_file)) {
+        waterfall_widget.gradient.set_default();
+    }
 }
 
 void WaterfallView::on_show() {
