@@ -332,6 +332,10 @@ WaterfallView::WaterfallView(const bool cursor) {
         }
     };
 
+    load_gradient();
+}
+
+void WaterfallView::load_gradient() {
     if (!waterfall_widget.gradient.load_file(default_gradient_file)) {
         waterfall_widget.gradient.set_default();
     }
@@ -357,6 +361,8 @@ void WaterfallView::stop() {
         baseband::spectrum_streaming_stop();
         running_ = false;
     }
+    this->channel_fifo = nullptr;
+    this->audio_spectrum_data = nullptr;
 }
 
 void WaterfallView::show_audio_spectrum_view(const bool show) {

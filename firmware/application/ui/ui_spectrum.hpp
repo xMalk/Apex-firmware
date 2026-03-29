@@ -146,6 +146,7 @@ class WaterfallView : public View {
 
     void set_parent_rect(const Rect new_parent_rect) override;
     void show_audio_spectrum_view(const bool show);
+    void load_gradient();
 
    private:
     void update_widgets_rect();
@@ -172,12 +173,16 @@ class WaterfallView : public View {
     MessageHandlerRegistration message_handler_channel_spectrum_config{
         Message::ID::ChannelSpectrumConfig,
         [this](const Message* const p) {
+            if (!running_)
+                return;
             const auto message = *reinterpret_cast<const ChannelSpectrumConfigMessage*>(p);
             this->channel_fifo = message.fifo;
         }};
     MessageHandlerRegistration message_handler_audio_spectrum{
         Message::ID::AudioSpectrum,
         [this](const Message* const p) {
+            if (!running_)
+                return;
             const auto message = *reinterpret_cast<const AudioSpectrumMessage*>(p);
             this->audio_spectrum_data = message.data;
             this->audio_spectrum_update = true;
@@ -185,6 +190,8 @@ class WaterfallView : public View {
     MessageHandlerRegistration message_handler_frame_sync{
         Message::ID::DisplayFrameSync,
         [this](const Message* const) {
+            if (!running_)
+                return;
             if (this->channel_fifo) {
                 ChannelSpectrum channel_spectrum;
                 while (channel_fifo->out(channel_spectrum)) {

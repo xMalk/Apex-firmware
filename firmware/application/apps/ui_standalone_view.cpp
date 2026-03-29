@@ -34,7 +34,7 @@
 namespace ui {
 
 void create_thread(int32_t (*fn)(void*), void* arg, size_t stack_size, int priority) {
-    // TODO: collect memory on terminate, once this is used
+    // TODO: collect memory on terminate, once this is used. This is a HUGE TODO! need to call chThdWait on all of them!
     chThdCreateFromHeap(NULL, stack_size, priority, fn, arg);
 }
 
@@ -285,9 +285,9 @@ bool StandaloneView::on_encoder(const EncoderEvent event) {
 
 bool StandaloneView::on_touch(const TouchEvent event) {
     if (get_application_information()->header_version > 1) {
-        get_application_information()->OnTouchEvent(event.point.x(), event.point.y(), (uint32_t)event.type);
+        return get_application_information()->OnTouchEvent(event.point.x(), event.point.y(), (uint32_t)event.type);
     }
-    return true;
+    return false;
 }
 
 bool StandaloneView::on_keyboard(const KeyboardEvent event) {

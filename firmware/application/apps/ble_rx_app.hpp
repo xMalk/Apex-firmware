@@ -42,6 +42,12 @@
 
 #include "recent_entries.hpp"
 
+// Add for heap debugging
+// For ChibiOS core functions
+#include "ch.h"
+#include "chcore.h"
+#include "chheap.h"
+
 class BLELogger {
    public:
     Optional<File::Error> append(const std::filesystem::path& filename) {
@@ -90,6 +96,7 @@ struct BleRecentEntry {
     uint64_t uniqueKey;
     int dbValue;
     BlePacketData packetData;
+
     std::string timestamp;
     std::string dataString;
     std::string nameString;
@@ -209,7 +216,7 @@ class BLERxView : public View {
     ~BLERxView();
 
     void set_parent_rect(const Rect new_parent_rect) override;
-    void paint(Painter&) override{};
+    void paint(Painter&) override {};
 
     void focus() override;
 
@@ -426,6 +433,20 @@ class BLERxView : public View {
         [this](const Message* const) {
             this->on_timer();
         }};
+
+    // Widget to control the list limit
+    Labels label_max_entries{
+        {{UI_POS_X(22), 10 * 8 - 2}, "List:", Theme::getInstance()->fg_light->foreground}};
+    NumberField field_max_entries{
+        {UI_POS_X(28), 10 * 8 - 2},  // Correct: Position (x, y)
+        2,                           // Number of digits
+        {5, 64},                     // Range (min, max) <- Coincides with max_entries
+        1,                           // Step size
+        ' '                          // Filler character
+    };
+
+    // Variable to store the current limit
+    size_t max_recent_entries = 25;
 }; /* BLERxView */
 
 } /* namespace ui */

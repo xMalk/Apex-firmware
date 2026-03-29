@@ -1086,8 +1086,8 @@ void ReconView::on_statistics_update(const ChannelStatistics& statistics) {
                     if (stepper < 0) stepper++;
                     if (stepper > 0) stepper--;
                 }  // if( recon || stepper != 0 || index_stepper != 0 )
-            }      // if (frequency_list.size() > 0 )
-        }          /* on_statistics_updates */
+            }  // if (frequency_list.size() > 0 )
+        } /* on_statistics_updates */
     }
     handle_retune();
     recon_redraw();
@@ -1261,6 +1261,7 @@ size_t ReconView::change_mode(freqman_index_t new_mod) {
             else
                 v = SPEC_MODULATION;
             field_mode.set_selected_index(v);
+            return;  // Important ! Guru will occur if you don't return when modifying field from within on_change !
         }
         last_mode = v;
         change_mode(v);

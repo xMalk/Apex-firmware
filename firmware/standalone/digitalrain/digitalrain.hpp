@@ -40,7 +40,7 @@ void shutdown();
 void OnFocus();
 bool OnKeyEvent(uint8_t);
 bool OnEncoder(int32_t);
-void OnTouchEvent(int, int, uint32_t);
+bool OnTouchEvent(int, int, uint32_t);
 bool OnKeyboad(uint8_t);
 void PaintViewMirror();
 
@@ -125,7 +125,7 @@ class DigitalRain {
 
    public:
     DigitalRain() {
-        std::srand(0);
+        srand(0);
         WIDTH = screen_width;
         HEIGHT = screen_height + 5;
         COLS = WIDTH / CHAR_WIDTH;

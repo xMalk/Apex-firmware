@@ -451,14 +451,22 @@ bool GeoMap::draw_osm_file(int zoom, int tile_x, int tile_y, int relative_x, int
         return false;
     }
     std::vector<ui::Color> line(clip_w);
-    for (int y = 0; y < clip_h; ++y) {
-        int source_row = src_y + y;
-        int dest_row = dest_y + y;
-        bmp.seek(src_x, source_row);
-        for (int x = 0; x < clip_w; ++x) {
-            bmp.read_next_px(line[x], true);
+    if (bmp.is_bottomup()) {
+        for (int y = clip_h - 1; y >= 0; --y) {
+            int source_row = src_y + y;
+            int dest_row = dest_y + y;
+            bmp.seek(src_x, source_row);
+            bmp.read_next_px_cnt(line.data(), clip_w, false);
+            painter.draw_pixels({dest_x + r.left(), dest_row + r.top(), clip_w, 1}, line);
         }
-        painter.draw_pixels({dest_x + r.left(), dest_row + r.top(), clip_w, 1}, line);
+    } else {
+        for (int y = 0; y < clip_h; ++y) {
+            int source_row = src_y + y;
+            int dest_row = dest_y + y;
+            bmp.seek(src_x, source_row);
+            bmp.read_next_px_cnt(line.data(), clip_w, false);
+            painter.draw_pixels({dest_x + r.left(), dest_row + r.top(), clip_w, 1}, line);
+        }
     }
     return true;
 }
@@ -642,7 +650,13 @@ void GeoMap::move(const float lon, const float lat) {
     } else {
         if (is_changed) {
             set_osm_max_zoom();
-            redraw_map = true;
+            double global_center_px = lon_to_pixel_x_tile(lon_, map_osm_zoom);
+            double global_center_py = lat_to_pixel_y_tile(lat_, map_osm_zoom);
+            // Redraw if viewport moved by at least 1 pixel (includes zoom level changes)
+            if (abs(global_center_px - (r.width() / 2.0) - viewport_top_left_px) >= 1.0 ||
+                abs(global_center_py - (r.height() / 2.0) - viewport_top_left_py) >= 1.0) {
+                redraw_map = true;
+            }
         }
     }
 }
